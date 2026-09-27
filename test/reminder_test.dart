@@ -7,9 +7,13 @@ void main() {
       id: 1,
       title: 'Agua hirviendo',
       scheduledTime: DateTime(2026, 9, 21, 10, 30),
+      isCompleted: true,
+      completedAt: DateTime(2026, 9, 21, 10, 30),
     );
     final restored = Reminder.fromJson(original.toJson());
     expect(restored.title, original.title);
     expect(restored.scheduledTime, original.scheduledTime);
+    expect(restored.isCompleted, isTrue);
+    expect(restored.completedAt, original.completedAt);
   });
 }

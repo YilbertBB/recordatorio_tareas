@@ -1,19 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../models/reminder.dart';
+import '../services/reminder_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_typography.dart';
 
 class NewReminderSheet extends StatefulWidget {
-  const NewReminderSheet({super.key});
+  /// Si se pasa, el sheet entra en modo edición
+  final Reminder? reminderToEdit;
+
+  /// Valores iniciales opcionales (para presets desde HomeScreen)
+  final String? initialTitle;
+  final int? initialMinutes;
+
+  const NewReminderSheet({
+    super.key,
+    this.reminderToEdit,
+    this.initialTitle,
+    this.initialMinutes,
+  });
 
   @override
   State<NewReminderSheet> createState() => _NewReminderSheetState();
 }
 
 class _NewReminderSheetState extends State<NewReminderSheet> {
-  int duration = 10;
-  int flameIndex = 0; // 0 alto, 1 medio, 2 lento
-  final _titleCtrl = TextEditingController(text: 'Vigilar punto de sal');
+  late int duration;
+  late int flameIndex;
+  late final TextEditingController _titleCtrl;
+
+  bool get _isEditing => widget.reminderToEdit != null;
 
   static const _flames = [('🔥', 'Alto'), ('🍳', 'Medio'), ('🍲', 'Lento')];
 
@@ -22,6 +39,27 @@ class _NewReminderSheetState extends State<NewReminderSheet> {
     ('🍚', 'Arroz', 15, 'Fuego medio'),
     ('🍲', 'Potaje', 30, 'Fuego lento'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final edit = widget.reminderToEdit;
+
+    if (edit != null) {
+      // Modo edición: precargar todo desde el recordatorio existente
+      _titleCtrl = TextEditingController(text: edit.title);
+      final remaining = edit.scheduledTime.difference(DateTime.now()).inMinutes;
+      duration = remaining > 0 ? remaining : 1;
+      flameIndex = 0;
+    } else {
+      // Modo creación
+      _titleCtrl = TextEditingController(
+        text: widget.initialTitle ?? 'Vigilar punto de sal',
+      );
+      duration = widget.initialMinutes ?? 10;
+      flameIndex = 0;
+    }
+  }
 
   @override
   void dispose() {
@@ -39,6 +77,42 @@ class _NewReminderSheetState extends State<NewReminderSheet> {
           ? 1
           : 2;
     });
+  }
+
+  String get _formattedDuration {
+    if (duration < 60) return '$duration';
+    final hours = duration ~/ 60;
+    final mins = duration % 60;
+    return mins == 0 ? '${hours}h' : '${hours}h ${mins}m';
+  }
+
+  // ─── Guardar / actualizar ──────────────────────────────────
+  Future<void> _save() async {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ponle un nombre al recordatorio')),
+      );
+      return;
+    }
+
+    final controller = context.read<ReminderController>();
+    final navigator = Navigator.of(context);
+
+    if (_isEditing) {
+      await controller.updateReminder(
+        widget.reminderToEdit!,
+        title: title,
+        duration: Duration(minutes: duration),
+      );
+    } else {
+      await controller.addReminder(
+        title: title,
+        duration: Duration(minutes: duration),
+      );
+    }
+
+    if (mounted) navigator.pop();
   }
 
   @override
@@ -73,12 +147,14 @@ class _NewReminderSheetState extends State<NewReminderSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Nuevo Recordatorio',
+                        _isEditing ? 'Editar Recordatorio' : 'Nuevo Recordatorio',
                         style: AppTypography.headlineMd,
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Cocina y labores del hogar',
+                        _isEditing
+                            ? 'Ajusta los detalles'
+                            : 'Cocina y labores del hogar',
                         style: AppTypography.bodySm.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -192,7 +268,7 @@ class _NewReminderSheetState extends State<NewReminderSheet> {
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton.icon(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: _save,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
@@ -201,9 +277,12 @@ class _NewReminderSheetState extends State<NewReminderSheet> {
                           borderRadius: AppRadius.brLg,
                         ),
                       ),
-                      icon: const Icon(Icons.timer, size: 22),
+                      icon: Icon(
+                        _isEditing ? Icons.check : Icons.timer,
+                        size: 22,
+                      ),
                       label: Text(
-                        'Iniciar Recordatorio',
+                        _isEditing ? 'Guardar Cambios' : 'Iniciar Recordatorio',
                         style: AppTypography.headlineSm.copyWith(
                           color: Colors.white,
                         ),
@@ -284,7 +363,7 @@ class _NewReminderSheetState extends State<NewReminderSheet> {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                '$duration',
+                _formattedDuration,
                 style: AppTypography.timerDisplayMobile.copyWith(
                   color: AppColors.primary,
                 ),
@@ -301,21 +380,21 @@ class _NewReminderSheetState extends State<NewReminderSheet> {
                 '−10m',
                 () => setState(() => duration = (duration - 10).clamp(1, 999)),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               _stepBtn(
                 '−5m',
                 () => setState(() => duration = (duration - 5).clamp(1, 999)),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               _roundStep(
                 '−',
                 () => setState(() => duration = (duration - 1).clamp(1, 999)),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               _roundStep('+', () => setState(() => duration++)),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               _stepBtn('+5m', () => setState(() => duration += 5)),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               _stepBtn('+10m', () => setState(() => duration += 10)),
             ],
           ),
@@ -332,7 +411,7 @@ class _NewReminderSheetState extends State<NewReminderSheet> {
         onTap: onTap,
         borderRadius: AppRadius.brBase,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Text(
             label,
             style: AppTypography.labelMd.copyWith(color: AppColors.textPrimary),

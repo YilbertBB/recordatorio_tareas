@@ -1,23 +1,98 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'dart:async';
+import '../models/reminder.dart';
+import '../services/reminder_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_typography.dart';
+import 'new_reminder_sheet.dart';
 
-class DetailSheet extends StatelessWidget {
-  const DetailSheet({
-    super.key,
-    required this.title,
-    required this.note,
-    required this.timeRemaining,
-    required this.progress,
-    required this.flameLabel,
-  });
+class DetailSheet extends StatefulWidget {
+  final Reminder reminder;
 
-  final String title;
-  final String note;
-  final String timeRemaining;
-  final double progress;
-  final String flameLabel;
+  const DetailSheet({super.key, required this.reminder});
+
+  @override
+  State<DetailSheet> createState() => _DetailSheetState();
+}
+
+class _DetailSheetState extends State<DetailSheet> {
+  Timer? _ticker;
+
+  Reminder get reminder => widget.reminder;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────
+  String get _timeRemaining {
+    final diff = reminder.scheduledTime.difference(DateTime.now());
+    if (diff.isNegative) return '00:00';
+    final m = diff.inMinutes.toString().padLeft(2, '0');
+    final s = (diff.inSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  double get _progress {
+    final total = reminder.scheduledTime.difference(DateTime.now()).inSeconds;
+    if (total <= 0) return 0.0;
+    return (total / 3600).clamp(0.0, 1.0);
+  }
+
+  String _formatTime(DateTime dt) {
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final m = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$h:$m $ampm';
+  }
+
+  String get _startTimeLabel {
+    // Estimamos la hora de inicio como (alarma - duración original).
+    // Como no guardamos la duración original, usamos la hora actual como referencia.
+    return _formatTime(DateTime.now());
+  }
+
+  // ─── Acciones ──────────────────────────────────────────────
+  void _postpone(BuildContext context, int minutes) {
+    final controller = context.read<ReminderController>();
+    controller.snoozeReminder(reminder, Duration(minutes: minutes));
+    Navigator.pop(context);
+  }
+
+  void _complete(BuildContext context) {
+    final controller = context.read<ReminderController>();
+    controller.completeReminder(reminder);
+    Navigator.pop(context);
+  }
+
+  void _delete(BuildContext context) {
+    final controller = context.read<ReminderController>();
+    controller.deleteReminder(reminder);
+    Navigator.pop(context);
+  }
+
+  void _edit(BuildContext context) {
+    Navigator.pop(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: AppColors.scrim,
+      builder: (_) => NewReminderSheet(reminderToEdit: reminder),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +104,7 @@ class DetailSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Grab handle
           Padding(
             padding: const EdgeInsets.only(top: 10, bottom: 6),
             child: Container(
@@ -40,6 +116,7 @@ class DetailSheet extends StatelessWidget {
               ),
             ),
           ),
+          // Header con chip y botón de editar
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
             child: Row(
@@ -63,13 +140,32 @@ class DetailSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  flameLabel,
+                  '🔥 Fuego alto',
                   style: AppTypography.bodySm.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const Spacer(),
+                // Botón editar (nuevo)
+                Material(
+                  color: AppColors.surfaceContainerSubtle,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    onTap: () => _edit(context),
+                    customBorder: const CircleBorder(),
+                    child: const SizedBox(
+                      width: 36,
+                      height: 36,
+                      child: Icon(
+                        Icons.edit_outlined,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
                 Material(
                   color: AppColors.surfaceContainerSubtle,
                   shape: const CircleBorder(),
@@ -90,25 +186,27 @@ class DetailSheet extends StatelessWidget {
               ],
             ),
           ),
+          // Body
           Flexible(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               child: Column(
                 children: [
                   Text(
-                    title,
+                    reminder.title,
                     textAlign: TextAlign.center,
                     style: AppTypography.headlineLg,
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    note,
+                    'Programado para ${_formatTime(reminder.scheduledTime)}',
                     textAlign: TextAlign.center,
                     style: AppTypography.bodyMd.copyWith(
                       color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 16),
+                  // Anillo de progreso
                   SizedBox(
                     width: 210,
                     height: 210,
@@ -119,7 +217,7 @@ class DetailSheet extends StatelessWidget {
                           width: 210,
                           height: 210,
                           child: CircularProgressIndicator(
-                            value: progress,
+                            value: _progress,
                             strokeWidth: 8,
                             backgroundColor: AppColors.surfaceContainerHighest,
                             valueColor: const AlwaysStoppedAnimation(
@@ -139,7 +237,7 @@ class DetailSheet extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              timeRemaining,
+                              _timeRemaining,
                               style: AppTypography.timerDisplayMobile,
                             ),
                             Text(
@@ -155,6 +253,7 @@ class DetailSheet extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  // Meta info
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -165,15 +264,15 @@ class DetailSheet extends StatelessWidget {
                       children: [
                         Expanded(
                           child: _meta(
-                            'Hora de inicio',
-                            '12:58 PM',
+                            'Creado',
+                            _startTimeLabel,
                             AppColors.textPrimary,
                           ),
                         ),
                         Expanded(
                           child: _meta(
-                            'Alarma estimada',
-                            '01:01 PM',
+                            'Alarma',
+                            _formatTime(reminder.scheduledTime),
                             AppColors.primary,
                           ),
                         ),
@@ -181,6 +280,7 @@ class DetailSheet extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  // Snooze
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -219,7 +319,7 @@ class DetailSheet extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                'Recordarme en 2 minutos',
+                                'Recordarme más tarde',
                                 style: AppTypography.bodySm.copyWith(
                                   color: AppColors.onPrimaryFixed.withValues(
                                     alpha: 0.8,
@@ -230,7 +330,7 @@ class DetailSheet extends StatelessWidget {
                           ),
                         ),
                         ElevatedButton.icon(
-                          onPressed: () {},
+                          onPressed: () => _postpone(context, 2),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
@@ -255,21 +355,35 @@ class DetailSheet extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  // Acciones rápidas
                   Row(
                     children: [
-                      _ghost('+5m', Icons.more_time),
+                      _ghost(
+                        '+5m',
+                        Icons.more_time,
+                        () => _postpone(context, 5),
+                      ),
                       const SizedBox(width: 8),
-                      _ghost('Pausar', Icons.pause),
+                      _ghost(
+                        '+10m',
+                        Icons.timer,
+                        () => _postpone(context, 10),
+                      ),
                       const SizedBox(width: 8),
-                      _ghost('Reiniciar', Icons.restart_alt),
+                      _ghost(
+                        '+10m',
+                        Icons.restart_alt,
+                        () => _postpone(context, 10),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
+                  // Botón completar
                   SizedBox(
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton.icon(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => _complete(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.secondary,
                         foregroundColor: Colors.white,
@@ -288,8 +402,9 @@ class DetailSheet extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  // Eliminar
                   TextButton.icon(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => _delete(context),
                     icon: const Icon(
                       Icons.delete_outline,
                       size: 18,
@@ -331,13 +446,13 @@ class DetailSheet extends StatelessWidget {
     );
   }
 
-  Widget _ghost(String label, IconData icon) {
+  Widget _ghost(String label, IconData icon, VoidCallback onTap) {
     return Expanded(
       child: Material(
         color: AppColors.surfaceContainerSubtle,
         borderRadius: AppRadius.brMd,
         child: InkWell(
-          onTap: () {},
+          onTap: onTap,
           borderRadius: AppRadius.brMd,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),

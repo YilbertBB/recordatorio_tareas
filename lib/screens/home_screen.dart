@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../models/reminder.dart';
+import '../services/reminder_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
 import '../theme/app_shadows.dart';
@@ -21,16 +24,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int heroSeconds = 165; // 02:45
-  bool heroRunning = true;
   Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!heroRunning) return;
-      if (heroSeconds > 0) setState(() => heroSeconds--);
+      if (!mounted) return;
+      context.read<ReminderController>().markExpiredRemindersCompleted();
+      setState(() {});
     });
   }
 
@@ -40,42 +42,63 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  String get _heroFormatted {
-    final m = (heroSeconds ~/ 60).toString().padLeft(2, '0');
-    final s = (heroSeconds % 60).toString().padLeft(2, '0');
+  // ─── Helpers de formato ────────────────────────────────────
+  String _formatRemaining(DateTime target) {
+    final diff = target.difference(DateTime.now());
+    if (diff.isNegative) return '00:00';
+    final m = diff.inMinutes.toString().padLeft(2, '0');
+    final s = (diff.inSeconds % 60).toString().padLeft(2, '0');
     return '$m:$s';
   }
 
-  double get _heroProgress => (heroSeconds / 165).clamp(0.0, 1.0);
+  double _progress(Reminder r) {
+    final total = r.scheduledTime.difference(DateTime.now()).inSeconds;
+    if (total <= 0) return 0.0;
+    return (total / 3600).clamp(0.0, 1.0);
+  }
 
-  void _openNewSheet() {
+  String _formatTimeOfDay(DateTime dt) {
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final m = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$h:$m $ampm';
+  }
+
+  // ─── Abrir sheets ──────────────────────────────────────────
+  void _openNewSheet({
+    String? presetTitle,
+    int? presetMinutes,
+    Reminder? reminderToEdit,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: AppColors.scrim,
-      builder: (_) => const NewReminderSheet(),
+      builder: (_) => NewReminderSheet(
+        reminderToEdit: reminderToEdit,
+        initialTitle: presetTitle,
+        initialMinutes: presetMinutes,
+      ),
     );
   }
 
-  void _openDetailSheet() {
+  void _openDetailSheet(Reminder reminder) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: AppColors.scrim,
-      builder: (_) => DetailSheet(
-        title: 'Vigilar agua hirviendo para el café',
-        note: 'Para colar la cafetera italiana moka.',
-        timeRemaining: _heroFormatted,
-        progress: _heroProgress,
-        flameLabel: 'Fuego alto 🔥',
-      ),
+      builder: (_) => DetailSheet(reminder: reminder),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final controller = context.watch<ReminderController>();
+    final reminders = controller.reminders;
+    final activeCount = reminders.where((reminder) => !reminder.isCompleted).length;
+
     return Scaffold(
       backgroundColor: AppColors.surfaceCanvas,
       appBar: AppBar(
@@ -83,24 +106,26 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text('Hola 👋', style: AppTypography.headlineMd),
             const SizedBox(width: 8),
-            const StatusChip(
-              label: '2 pendientes',
-              variant: ChipVariant.urgent,
-              pulse: true,
+            StatusChip(
+              label: '$activeCount pendientes',
+              variant: activeCount == 0
+                  ? ChipVariant.neutral
+                  : ChipVariant.urgent,
+              pulse: activeCount > 0,
             ),
           ],
         ),
       ),
       extendBody: true,
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 16), // ← sube 16px
+        padding: const EdgeInsets.only(bottom: 16),
         child: Container(
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
             boxShadow: AppShadows.primaryHalo,
           ),
           child: FloatingActionButton(
-            onPressed: _openNewSheet,
+            onPressed: () => _openNewSheet(),
             elevation: 0,
             highlightElevation: 0,
             backgroundColor: AppColors.primary,
@@ -121,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 delegate: SliverChildListDelegate([
                   _presetsSection(),
                   const SizedBox(height: 24),
-                  _tasksSection(),
+                  _tasksSection(controller, reminders),
                   const SizedBox(height: 24),
                   const TipCard(),
                   const SizedBox(height: 16),
@@ -168,7 +193,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       emoji: p.$1,
                       title: p.$2,
                       minutes: p.$3,
-                      onTap: _openNewSheet,
+                      onTap: () => _openNewSheet(
+                        presetTitle: p.$2,
+                        presetMinutes: p.$3,
+                      ),
                     ),
                   ),
                 )
@@ -180,100 +208,210 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ─── Tasks ─────────────────────────────────────────────────
-  Widget _tasksSection() {
+  Widget _tasksSection(
+    ReminderController controller,
+    List<Reminder> reminders,
+  ) {
+    final activeReminders = reminders.where((r) => !r.isCompleted).toList();
+    final completedReminders = reminders.where((r) => r.isCompleted).toList();
+
+    if (activeReminders.isEmpty && completedReminders.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('En marcha', style: AppTypography.headlineMd),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerSubtle,
+              borderRadius: AppRadius.brLg,
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.notifications_none, size: 40),
+                const SizedBox(height: 8),
+                Text(
+                  'No hay recordatorios activos',
+                  style: AppTypography.bodyMd,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Crea uno con el botón +',
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    final first = activeReminders.isEmpty ? null : activeReminders.first;
+    final rest = activeReminders.skip(1).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text('En marcha', style: AppTypography.headlineMd),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.primaryFixed,
-                borderRadius: AppRadius.brFull,
-              ),
-              child: Text(
-                '3 activos',
-                style: AppTypography.labelMd.copyWith(
-                  color: AppColors.onPrimaryFixed,
+        if (first != null) ...[
+          Row(
+            children: [
+              Text('En marcha', style: AppTypography.headlineMd),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryFixed,
+                  borderRadius: AppRadius.brFull,
+                ),
+                child: Text(
+                  '${activeReminders.length} activos',
+                  style: AppTypography.labelMd.copyWith(
+                    color: AppColors.onPrimaryFixed,
+                  ),
                 ),
               ),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: _openNewSheet,
-              icon: const Icon(
-                Icons.add_circle,
-                size: 18,
-                color: AppColors.primary,
-              ),
-              label: Text(
-                'Nuevo',
-                style: AppTypography.bodySm.copyWith(
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _openNewSheet(),
+                icon: const Icon(
+                  Icons.add_circle,
+                  size: 18,
                   color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
+                ),
+                label: Text(
+                  'Nuevo',
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _swipeable(
+            first,
+            HeroTimerCard(
+              title: first.title,
+              subtitle: 'Suena a las ${_formatTimeOfDay(first.scheduledTime)}',
+              timeRemaining: _formatRemaining(first.scheduledTime),
+              progress: _progress(first),
+              isRunning: first.isActive,
+              onToggle: () => controller.toggleReminder(first),
+              onComplete: () => controller.completeReminder(first),
+              onAddMinutes: (m) => controller.snoozeReminder(
+                first,
+                Duration(minutes: m),
+              ),
+              onOpenDetail: () => _openDetailSheet(first),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...rest.map(
+            (r) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _swipeable(
+                r,
+                GenericTaskCard(
+                  icon: Icons.notifications_active,
+                  title: r.title,
+                  metaLabel: _formatTimeOfDay(r.scheduledTime),
+                  categoryLabel: 'Recordatorio',
+                  trailingTimer: _formatRemaining(r.scheduledTime),
+                  progress: _progress(r),
+                  footerLabel: 'Suena a las ${_formatTimeOfDay(r.scheduledTime)}',
+                  iconBg: AppColors.tertiaryFixed,
+                  iconColor: AppColors.onTertiaryFixed,
+                  onAddMinutes: () => controller.snoozeReminder(r, const Duration(minutes: 5)),
+                  onComplete: () => controller.completeReminder(r),
+                  onTap: () => _openDetailSheet(r),
                 ),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        HeroTimerCard(
-          title: 'Agua hirviendo para el café',
-          subtitle: 'Para colar la cafetera italiana moka',
-          timeRemaining: _heroFormatted,
-          progress: _heroProgress,
-          isRunning: heroRunning,
-          onToggle: () => setState(() => heroRunning = !heroRunning),
-          onComplete: () {},
-          onAddMinutes: (m) => setState(() => heroSeconds += m * 60),
-          onOpenDetail: _openDetailSheet,
-        ),
-        const SizedBox(height: 12),
-        GenericTaskCard(
-          icon: Icons.soup_kitchen,
-          title: 'Apagar olla del potaje',
-          metaLabel: 'Fuego lento',
-          categoryLabel: 'Cocina',
-          trailingTimer: '18:10',
-          progress: 0.45,
-          footerLabel: 'Suena a las 1:18 PM',
-          iconBg: AppColors.tertiaryFixed,
-          iconColor: AppColors.onTertiaryFixed,
-          onAddMinutes: () {},
-          onComplete: () {},
-          onTap: _openDetailSheet,
-        ),
-        const SizedBox(height: 12),
-        GenericTaskCard(
-          icon: Icons.six_k_plus_outlined,
-          title: 'Bajar el fuego al arroz',
-          metaLabel: '1:30 PM',
-          categoryLabel: 'Cocina',
-          iconBg: AppColors.surfaceContainerHighest,
-          iconColor: AppColors.textSecondary,
-          onComplete: () {},
-          onTap: _openDetailSheet,
-        ),
-        const SizedBox(height: 12),
-        GenericTaskCard(
-          icon: Icons.ac_unit,
-          title: 'Sacar el pollo de descongelar',
-          metaLabel: 'Faltan 45m',
-          categoryLabel: 'Hogar',
-          iconBg: AppColors.surfaceContainerHighest,
-          iconColor: AppColors.textSecondary,
-          onComplete: () {},
-          onTap: _openDetailSheet,
-        ),
-        const SizedBox(height: 12),
-        const CompletedTaskCard(
-          title: 'Cerrar la llave del gas',
-          completedAt: '12:40 PM',
-        ),
+          ),
+        ],
+        if (completedReminders.isNotEmpty) ...[
+          if (first != null) const SizedBox(height: 12),
+          Text('Completadas', style: AppTypography.headlineMd),
+          const SizedBox(height: 12),
+          ...completedReminders.map(
+            (r) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _swipeable(
+                r,
+                CompletedTaskCard(
+                  title: r.title,
+                  completedAt: _formatTimeOfDay(
+                    r.completedAt ?? r.scheduledTime,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _swipeable(Reminder reminder, Widget child) {
+    return Dismissible(
+      key: ValueKey('reminder-${reminder.id}'),
+      direction: DismissDirection.horizontal,
+      background: _swipeAction(
+        color: AppColors.primary,
+        icon: Icons.edit_outlined,
+        label: 'Editar',
+        alignment: Alignment.centerLeft,
+      ),
+      secondaryBackground: _swipeAction(
+        color: AppColors.error,
+        icon: Icons.delete_outline,
+        label: 'Eliminar',
+        alignment: Alignment.centerRight,
+      ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          _openNewSheet(reminderToEdit: reminder);
+          return false;
+        }
+        await context.read<ReminderController>().deleteReminder(reminder);
+        return true;
+      },
+      child: child,
+    );
+  }
+
+  Widget _swipeAction({
+    required Color color,
+    required IconData icon,
+    required String label,
+    required Alignment alignment,
+  }) {
+    return Container(
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: AppRadius.brLg,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: AppTypography.bodyMd.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -283,7 +421,7 @@ class _HomeScreenState extends State<HomeScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         ElevatedButton.icon(
-          onPressed: _openNewSheet,
+          onPressed: () => _openNewSheet(),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
@@ -302,7 +440,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(width: 10),
         OutlinedButton.icon(
-          onPressed: _openDetailSheet,
+          onPressed: () {
+            final reminders = context.read<ReminderController>().reminders;
+            if (reminders.isNotEmpty) _openDetailSheet(reminders.first);
+          },
           style: OutlinedButton.styleFrom(
             backgroundColor: AppColors.surfaceContainerSubtle,
             foregroundColor: AppColors.textPrimary,

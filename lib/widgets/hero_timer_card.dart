@@ -191,59 +191,59 @@ class HeroTimerCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
 
             // Quick actions
-            Row(
-              children: [
-                _pillAction(
-                  icon: Icons.add,
-                  label: '+5 min',
-                  onTap: () => onAddMinutes(5),
+           Row(
+  children: [
+    Expanded(
+      child: _pillAction(
+        icon: Icons.add,
+        label: '+5 min',
+        onTap: () => onAddMinutes(5),
+      ),
+    ),
+    const SizedBox(width: 6),
+    Expanded(
+      child: _pillAction(
+        icon: Icons.snooze,
+        label: '+2m',
+        onTap: () => onAddMinutes(2),
+      ),
+    ),
+    const SizedBox(width: 6),
+    Expanded(
+      child: _pillAction(
+        icon: isRunning ? Icons.pause : Icons.play_arrow,
+        label: isRunning ? 'Pausar' : 'Reanudar',
+        onTap: onToggle,
+      ),
+    ),
+    const SizedBox(width: 6),
+    // El botón "Listo" NO se expande: mantiene su ancho natural
+    Material(
+      color: AppColors.secondary,
+      borderRadius: AppRadius.brMd,
+      child: InkWell(
+        onTap: onComplete,
+        borderRadius: AppRadius.brMd,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              const Icon(Icons.check, size: 18, color: Colors.white),
+              const SizedBox(width: 4),
+              Text(
+                'Listo',
+                style: AppTypography.labelMd.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(width: 6),
-                _pillAction(
-                  icon: Icons.snooze,
-                  label: '+2m',
-                  onTap: () => onAddMinutes(2),
-                ),
-                const SizedBox(width: 6),
-                _pillAction(
-                  icon: isRunning ? Icons.pause : Icons.play_arrow,
-                  label: isRunning ? 'Pausar' : 'Reanudar',
-                  onTap: onToggle,
-                ),
-                const Spacer(),
-                Material(
-                  color: AppColors.secondary,
-                  borderRadius: AppRadius.brMd,
-                  child: InkWell(
-                    onTap: onComplete,
-                    borderRadius: AppRadius.brMd,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.check,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Listo',
-                            style: AppTypography.labelMd.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  ],
+)
           ],
         ),
       ),
@@ -251,32 +251,37 @@ class HeroTimerCard extends StatelessWidget {
   }
 
   Widget _pillAction({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: AppColors.surfaceContainerSubtle,
+  required IconData icon,
+  required String label,
+  required VoidCallback onTap,
+}) {
+  return Material(
+    color: AppColors.surfaceContainerSubtle,
+    borderRadius: AppRadius.brMd,
+    child: InkWell(
+      onTap: onTap,
       borderRadius: AppRadius.brMd,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.brMd,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          child: Row(
-            children: [
-              Icon(icon, size: 16, color: AppColors.textPrimary),
-              const SizedBox(width: 4),
-              Text(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10), // ← 10 → 8
+        child: Row(
+          mainAxisSize: MainAxisSize.min,           // ← importante
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: AppColors.textPrimary),
+            const SizedBox(width: 4),
+            Flexible(                                 // ← evita overflow de texto
+              child: Text(
                 label,
-                style: AppTypography.labelMd.copyWith(
-                  color: AppColors.textPrimary,
-                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.labelMd
+                    .copyWith(color: AppColors.textPrimary),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
