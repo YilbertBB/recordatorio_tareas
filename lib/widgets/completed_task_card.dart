@@ -21,7 +21,7 @@ class CompletedTaskCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerSubtle,
+          color: AppColors.surfaceContainerLowest,
           borderRadius: AppRadius.brLg,
         ),
         child: Row(

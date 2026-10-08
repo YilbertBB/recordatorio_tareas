@@ -131,7 +131,7 @@ class HeroTimerCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.surfaceContainerSubtle,
+                color: AppColors.surfaceContainerLowest,
                 borderRadius: AppRadius.brMd,
               ),
               child: Row(
@@ -256,7 +256,7 @@ class HeroTimerCard extends StatelessWidget {
   required VoidCallback onTap,
 }) {
   return Material(
-    color: AppColors.surfaceContainerSubtle,
+    color: AppColors.surfaceContainerLowest,
     borderRadius: AppRadius.brMd,
     child: InkWell(
       onTap: onTap,

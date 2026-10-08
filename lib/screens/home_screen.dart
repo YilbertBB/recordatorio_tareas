@@ -225,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.surfaceContainerSubtle,
+              color: AppColors.surfaceContainerLowest,
               borderRadius: AppRadius.brLg,
             ),
             child: Column(
@@ -445,7 +445,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (reminders.isNotEmpty) _openDetailSheet(reminders.first);
           },
           style: OutlinedButton.styleFrom(
-            backgroundColor: AppColors.surfaceContainerSubtle,
+            backgroundColor: AppColors.surfaceContainerLowest,
             foregroundColor: AppColors.textPrimary,
             side: BorderSide.none,
             shape: RoundedRectangleBorder(borderRadius: AppRadius.brFull),

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -24,13 +26,21 @@ tz.setLocalLocation(tz.getLocation(timeZoneInfo.identifier));
   // 2. Inicializar el plugin de notificaciones
   await _initNotifications();
 
-  SystemChrome.setSystemUIOverlayStyle(
+ SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
+      statusBarIconBrightness: Brightness.light,       // Android → iconos blancos
+      statusBarBrightness: Brightness.dark,             // iOS → fondo oscuro
       systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarDividerColor: Colors.transparent,
     ),
   );
+
+    SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
   runApp(
     ChangeNotifierProvider(
@@ -85,7 +95,33 @@ class WarmHearthApp extends StatelessWidget {
       title: 'Warm Hearth & Rhythm',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      themeMode: ThemeMode.dark,
+
       home: const HomeScreen(),
+
+      scrollBehavior: const _NoGlowScrollBehavior(),
+
     );
   }
+}
+
+class _NoGlowScrollBehavior extends MaterialScrollBehavior {
+  const _NoGlowScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child; // sin glow, sin stretch
+  }
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
 }

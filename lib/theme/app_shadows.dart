@@ -1,61 +1,91 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
-/// "Tactile Tonal Layers" — sombras cálidas, no agresivas.
+/// "Dark Luminous Stacking" — sombras sutiles + Amber Aura para urgencia.
+/// En OLED el peso visual lo dan los halos de color, no las dropshadows.
 class AppShadows {
   AppShadows._();
 
   /// Layer 1: Cards & Inset Rails
+  /// Sombra prácticamente invisible sobre OLED; la jerarquía la da el border.
   static const List<BoxShadow> card = [
     BoxShadow(
-      color: Color(0x0A1E1E24), // rgba(30,30,36,0.04)
-      blurRadius: 3,
-      offset: Offset(0, 1),
-    ),
-    BoxShadow(
-      color: Color(0x0DE85D04), // rgba(232,93,4,0.05)
-      blurRadius: 16,
-      offset: Offset(0, 6),
-      spreadRadius: -4,
-    ),
-  ];
-
-  /// Layer 2: FABs & Active Timers (halo cálido)
-  static const List<BoxShadow> primaryHalo = [
-    BoxShadow(
-      color: Color(0x47E85D04), // rgba(232,93,4,0.28)
-      blurRadius: 20,
-      offset: Offset(0, 4),
+      color: Color(0x33000000), // negro suave
+      blurRadius: 8,
+      offset: Offset(0, 2),
       spreadRadius: -2,
     ),
   ];
 
-  /// Layer 3: Bottom Sheets
+  /// Layer 2: The Amber Aura — FABs & Active Timers (urgencia alta)
+  /// Dual-ring: inner border + diffuse blur (según DESIGN.md)
+  static const List<BoxShadow> primaryHalo = [
+    BoxShadow(
+      color: Color(0x2EF97316), // rgba(249,115,22,0.18)
+      blurRadius: 24,
+      offset: Offset.zero,
+      spreadRadius: 0,
+    ),
+  ];
+
+  /// Layer 2b: Cyan halo — para checklists resueltas / progress pasivo
+  static const List<BoxShadow> cyanHalo = [
+    BoxShadow(
+      color: Color(0x2E38BDF8), // rgba(56,189,248,0.18)
+      blurRadius: 24,
+      offset: Offset.zero,
+    ),
+  ];
+
+  /// Layer 2c: Emerald halo — para estados "listo / completado"
+  static const List<BoxShadow> emeraldHalo = [
+    BoxShadow(
+      color: Color(0x2E10B981), // rgba(16,185,129,0.18)
+      blurRadius: 24,
+      offset: Offset.zero,
+    ),
+  ];
+
+  /// Layer 3: Bottom Sheets — deep ambient drop sobre OLED
   static const List<BoxShadow> sheet = [
     BoxShadow(
-      color: Color(0x141E1E24), // rgba(30,30,36,0.08)
+      color: Color(0x66020617), // rgba(2,6,23,0.4)
       blurRadius: 32,
       offset: Offset(0, -8),
     ),
   ];
 
-  /// Nav bar bottom
+  /// Nav bar bottom — sutil elevación
   static const List<BoxShadow> navBar = [
-    BoxShadow(color: Color(0x0D1E1E24), blurRadius: 20, offset: Offset(0, -4)),
+    BoxShadow(
+      color: Color(0x66020617),
+      blurRadius: 24,
+      offset: Offset(0, -4),
+    ),
   ];
 
-  /// Hairline superior del sheet
+  /// Hairline superior del sheet (blanco translúcido)
   static const Border sheetHairline = Border(
-    top: BorderSide(color: Color(0xCCFFFFFF), width: 0.8),
+    top: BorderSide(color: Color(0x14FFFFFF), width: 1),
   );
 
-  /// Card border
+  /// Card border — hairline slate/blanco 7%
   static const Border cardBorder = Border.fromBorderSide(
     BorderSide(color: AppColors.surfaceBorder, width: 1),
   );
 
-  /// Hero timer border
+  /// Borde secundario — slate-700 para inputs / secondary buttons
+  static const Border secondaryBorder = Border.fromBorderSide(
+    BorderSide(color: Color(0xFF334155), width: 1),
+  );
+
+  /// Hero timer border — amber translúcido (1.5px, inner ring)
   static const Border heroBorder = Border.fromBorderSide(
-    BorderSide(color: Color(0x66E85D04), width: 1.5),
+    BorderSide(color: Color(0x66F97316), width: 1.5),
+  );
+
+  /// Border de inputs focus (amber ring)
+  static const Border focusBorder = Border.fromBorderSide(
+    BorderSide(color: Color(0xFFF97316), width: 1),
   );
 }

@@ -28,7 +28,7 @@ class QuickPresetButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.surfaceContainerSubtle,
+            color: AppColors.surfaceContainerLowest,
             borderRadius: AppRadius.brFull,
             boxShadow: AppShadows.card,
           ),

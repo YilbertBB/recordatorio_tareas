@@ -65,7 +65,7 @@ class _StatusChipState extends State<StatusChip>
         text = Colors.white;
         break;
       case ChipVariant.neutral:
-        bg = AppColors.surfaceContainerSubtle;
+        bg = AppColors.surfaceContainerLowest;
         border = Colors.transparent;
         text = AppColors.textSecondary;
     }

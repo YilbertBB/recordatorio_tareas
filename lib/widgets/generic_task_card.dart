@@ -74,7 +74,7 @@ class GenericTaskCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.surfaceContainerSubtle,
+                              color: AppColors.surfaceContainerLowest,
                               borderRadius: AppRadius.brFull,
                             ),
                             child: Text(
@@ -115,7 +115,7 @@ class GenericTaskCard extends StatelessWidget {
                   ),
                 ] else if (onComplete != null)
                   Material(
-                    color: AppColors.surfaceContainerSubtle,
+                    color: AppColors.surfaceContainerLowest,
                     shape: const CircleBorder(),
                     child: InkWell(
                       onTap: onComplete,
@@ -159,7 +159,7 @@ class GenericTaskCard extends StatelessWidget {
                   const Spacer(),
                   if (onAddMinutes != null)
                     Material(
-                      color: AppColors.surfaceContainerSubtle,
+                      color: AppColors.surfaceContainerLowest,
                       borderRadius: AppRadius.brMd,
                       child: InkWell(
                         onTap: onAddMinutes,
